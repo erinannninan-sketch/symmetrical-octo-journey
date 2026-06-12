@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pulse — Morning Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+
+<!-- ── HERO ──────────────────────────────────────────────────────────────── -->
+<header class="hero">
+  <div class="hero-left">
+    <div class="pulse-logo">
+      <span class="pulse-dot"></span>
+      <span class="pulse-word">PULSE</span>
+    </div>
+    <p class="hero-sub">{{ now }} &nbsp;·&nbsp; <span id="live-time">{{ time }}</span></p>
+  </div>
+
+  <div class="hero-quote">
+    {% if quote %}
+    <blockquote>
+      <p>"{{ quote.text }}"</p>
+      <cite>— {{ quote.author }}</cite>
+    </blockquote>
+    {% endif %}
+  </div>
+
+  <div class="hero-actions">
+    <button class="btn-ghost" onclick="sendDigest()">📧 Send Digest</button>
+    <button class="btn-ghost" onclick="refreshAll()">⟳ Refresh</button>
+  </div>
+</header>
+
+<!-- ── GRID ──────────────────────────────────────────────────────────────── -->
+<main class="grid">
+
+  <!-- WEATHER -->
+  <section class="card card--weather" id="card-weather">
+    <div class="card-label">WEATHER</div>
+    {% if weather and weather.current %}
+      {% set w = weather.current %}
+      <div class="weather-hero">
+        <span class="weather-icon">{{ w.icon }}</span>
+        <div>
+          <div class="weather-temp">{{ w.temp }}<span class="unit">{{ w.unit }}</span></div>
+          <div class="weather-city">{{ w.city }}</div>
+        </div>
+      </div>
+      <div class="weather-meta">
+        <span>{{ w.description }}</span>
+        <span>💧 {{ w.humidity }}%</span>
+        <span>💨 {{ w.wind_kph }} km/h</span>
+        <span>Feels {{ w.feels_like }}{{ w.unit }}</span>
+      </div>
+      {% if weather.forecast %}
+      <div class="forecast">
+        {% for day in weather.forecast %}
+        <div class="forecast-day">
+          <div class="forecast-label">{{ day.day[:3] }}</div>
+          <div class="forecast-icon">{{ day.icon }}</div>
+          <div class="forecast-temps">
+            <span class="hi">{{ day.high }}°</span>
+            <span class="lo">{{ day.low }}°</span>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    {% else %}
+      <p class="muted">Weather unavailable — check WEATHER_API_KEY in .env</p>
+    {% endif %}
+  </section>
+
+  <!-- SYSTEM -->
+  <section class="card card--system" id="card-system">
+    <div class="card-label">SYSTEM</div>
+    {% if system and not system.error %}
+      <div class="sys-row">
+        <span class="sys-label">CPU</span>
+        <div class="bar-track"><div class="bar-fill {{ system.cpu.status }}" style="width: {{ system.cpu.percent }}%"></div></div>
+        <span class="sys-val">{{ system.cpu.percent }}%</span>
+      </div>
+      <div class="sys-row">
+        <span class="sys-label">RAM</span>
+        <div class="bar-track"><div class="bar-fill {{ system.ram.status }}" style="width: {{ system.ram.percent }}%"></div></div>
+        <span class="sys-val">{{ system.ram.used_gb }}GB</span>
+      </div>
+      <div class="sys-row">
+        <span class="sys-label">DISK</span>
+        <div class="bar-track"><div class="bar-fill {{ system.disk.status }}" style="width: {{ system.disk.percent }}%"></div></div>
+        <span class="sys-val">{{ system.disk.free_gb }}GB free</span>
+      </div>
+
+      <div class="sys-meta">
+        <div class="sys-chip">⏱ {{ system.uptime }}</div>
+        <div class="sys-chip">🖥 {{ system.os }}</div>
+        <div class="sys-chip">↑ {{ system.network.sent_kbps }} KB/s</div>
+        <div class="sys-chip">↓ {{ system.network.recv_kbps }} KB/s</div>
+      </div>
+
+      {% if system.processes %}
+      <div class="proc-list">
+        {% for p in system.processes[:4] %}
+        <div class="proc-row">
+          <span class="proc-name">{{ p.name[:20] }}</span>
+          <span class="proc-cpu">{{ p.cpu }}%</span>
+          <span class="proc-mem muted">{{ p.mem }}% mem</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    {% else %}
+      <p class="muted">{{ system.error if system else "System data unavailable" }}</p>
+    {% endif %}
+    <button class="btn-mini" onclick="refreshSystem()">↺ Live refresh</button>
+  </section>
+
+  <!-- STUDY TRACKER -->
+  <section class="card card--study" id="card-study">
+    <div class="card-label">STUDY TRACKER</div>
+
+    {% if study.active %}
+    <div class="active-session">
+      <span class="dot-live"></span>
+      <strong>{{ study.active.topic }}</strong> in progress
+      <br/><span class="muted" style="font-size:0.78rem">Started {{ study.active.start[11:16] }}</span>
+    </div>
+    {% endif %}
+
+    <div class="study-stats">
+      <div class="stat-box">
+        <div class="stat-val">{{ study.today_min }}<span class="stat-unit">min</span></div>
+        <div class="stat-label">Today</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val">{{ study.total_hours }}<span class="stat-unit">h</span></div>
+        <div class="stat-label">This week</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val">{{ study.session_count }}</div>
+        <div class="stat-label">Sessions</div>
+      </div>
+    </div>
+
+    <!-- Topics bar chart (CSS only) -->
+    {% if study.topics %}
+    <div class="topic-chart">
+      {% set max_min = study.topics.values() | max %}
+      {% for topic, mins in study.topics | dictsort(by='value', reverse=true) %}
+      {% if loop.index <= 4 %}
+      <div class="topic-row">
+        <span class="topic-name">{{ topic[:18] }}</span>
+        <div class="topic-bar-track">
+          <div class="topic-bar-fill" style="width: {{ [(mins / max_min * 100), 100] | min }}%"></div>
+        </div>
+        <span class="topic-mins">{{ mins | round(0) | int }}m</span>
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Quick-log controls -->
+    <div class="study-controls">
+      <input id="study-topic" class="input-field" placeholder="Topic (e.g. Arduino)" />
+      {% if study.active %}
+        <button class="btn-accent" onclick="studyStop()">⏹ Stop</button>
+      {% else %}
+        <button class="btn-accent" onclick="studyStart()">▶ Start</button>
+      {% endif %}
+    </div>
+    <div id="study-msg" class="study-msg"></div>
+  </section>
+
+  <!-- GITHUB -->
+  <section class="card card--github" id="card-github">
+    <div class="card-label">GITHUB</div>
+    {% if github and not github.error %}
+      <div class="gh-profile">
+        {% if github.avatar %}
+        <img src="{{ github.avatar }}" class="gh-avatar" alt="avatar" />
+        {% endif %}
+        <div>
+          <div class="gh-name">{{ github.name }}</div>
+          <div class="muted" style="font-size:0.78rem">@{{ github.username }}</div>
+          {% if github.bio %}<div class="gh-bio">{{ github.bio }}</div>{% endif %}
+        </div>
+      </div>
+
+      <div class="gh-stats">
+        <div class="gh-stat"><span class="gh-num">{{ github.public_repos }}</span><span class="gh-label">repos</span></div>
+        <div class="gh-stat"><span class="gh-num">{{ github.followers }}</span><span class="gh-label">followers</span></div>
+        <div class="gh-stat"><span class="gh-num streak">{{ github.streak_days }}🔥</span><span class="gh-label">streak</span></div>
+      </div>
+
+      {% if github.recent_commits %}
+      <div class="commit-list">
+        <div class="section-micro">Recent commits</div>
+        {% for c in github.recent_commits[:4] %}
+        <div class="commit-row">
+          <span class="commit-sha">{{ c.sha }}</span>
+          <span class="commit-msg">{{ c.message }}</span>
+          <span class="commit-time muted">{{ c.time }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% if github.repos %}
+      <div class="repo-list">
+        <div class="section-micro">Top repos</div>
+        {% for r in github.repos[:3] %}
+        <div class="repo-row">
+          <a href="{{ r.url }}" target="_blank" class="repo-name">{{ r.name }}</a>
+          <span class="repo-lang muted">{{ r.language }}</span>
+          <span class="repo-stars">★ {{ r.stars }}</span>
+          <span class="repo-time muted">{{ r.updated }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    {% else %}
+      <p class="muted">{{ github.error if github else "Configure GITHUB_USERNAME in .env" }}</p>
+    {% endif %}
+  </section>
+
+  <!-- NEWS -->
+  <section class="card card--news" id="card-news">
+    <div class="card-label">NEWS</div>
+    {% if news %}
+      {% for topic, articles in news.items() %}
+      <div class="news-topic">
+        <div class="news-topic-label">{{ topic | upper }}</div>
+        {% for a in articles %}
+        <div class="news-article">
+          <a href="{{ a.url }}" target="_blank" class="news-title">{{ a.title }}</a>
+          <div class="news-meta">
+            <span class="muted">{{ a.source }}</span>
+            <span class="muted">{{ a.time }}</span>
+          </div>
+          {% if a.summary %}
+          <p class="news-summary">{{ a.summary }}</p>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    {% else %}
+      <p class="muted">Configure NEWS_API_KEY in .env</p>
+    {% endif %}
+  </section>
+
+</main>
+
+<!-- ── TOAST ──────────────────────────────────────────────────────────────── -->
+<div id="toast" class="toast"></div>
+
+<!-- ── SCRIPTS ────────────────────────────────────────────────────────────── -->
+<script>
+  // Live clock
+  function updateClock() {
+    const now = new Date();
+    document.getElementById("live-time").textContent =
+      now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+  }
+  setInterval(updateClock, 1000);
+
+  // Toast
+  function toast(msg, type = "ok") {
+    const t = document.getElementById("toast");
+    t.textContent = msg;
+    t.className = "toast show " + type;
+    setTimeout(() => t.className = "toast", 3200);
+  }
+
+  // Refresh all
+  async function refreshAll() {
+    toast("Refreshing…", "info");
+    const r = await fetch("/api/refresh");
+    if (r.ok) { toast("Done — reloading page."); setTimeout(() => location.reload(), 800); }
+    else toast("Refresh failed.", "error");
+  }
+
+  // Send digest
+  async function sendDigest() {
+    toast("Sending digest…", "info");
+    const r = await fetch("/api/send-digest", { method: "POST" });
+    const d = await r.json();
+    toast(d.msg, d.ok ? "ok" : "error");
+  }
+
+  // Live system refresh
+  async function refreshSystem() {
+    const r = await fetch("/api/system");
+    const sys = await r.json();
+    if (sys.error) { toast(sys.error, "error"); return; }
+    // Update bars (simple DOM patch)
+    const rows = document.querySelectorAll(".sys-row .bar-fill");
+    if (rows[0]) rows[0].style.width = sys.cpu.percent + "%";
+    if (rows[1]) rows[1].style.width = sys.ram.percent + "%";
+    if (rows[2]) rows[2].style.width = sys.disk.percent + "%";
+    toast("System stats updated.");
+  }
+
+  // Study tracker
+  async function studyStart() {
+    const topic = document.getElementById("study-topic").value.trim() || "General";
+    const r = await fetch("/api/study/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ topic }),
+    });
+    const d = await r.json();
+    document.getElementById("study-msg").textContent = d.msg;
+    toast(d.msg, d.ok ? "ok" : "error");
+    if (d.ok) setTimeout(() => location.reload(), 1000);
+  }
+
+  async function studyStop() {
+    const notes = document.getElementById("study-topic").value.trim();
+    const r = await fetch("/api/study/stop", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notes }),
+    });
+    const d = await r.json();
+    document.getElementById("study-msg").textContent = d.msg;
+    toast(d.msg, d.ok ? "ok" : "error");
+    if (d.ok) setTimeout(() => location.reload(), 1000);
+  }
+</script>
+</body>
+</html>

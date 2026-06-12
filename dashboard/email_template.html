@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pulse Daily Digest</title>
+  <style>
+    body { margin:0; padding:0; background:#0D1117; font-family:'Segoe UI',Arial,sans-serif; color:#E6EDF3; }
+    .wrapper { max-width:600px; margin:0 auto; padding:24px 16px; }
+    .header { border-bottom:1px solid #00FFD130; padding-bottom:16px; margin-bottom:24px; }
+    .logo { font-family:'Courier New',monospace; font-size:1.6rem; font-weight:700;
+            color:#00FFD1; letter-spacing:.25em; }
+    .date { font-size:0.8rem; color:#8B9BB4; margin-top:4px; }
+    .section { margin-bottom:28px; }
+    .section-title { font-size:0.68rem; letter-spacing:.15em; color:#00FFD1;
+                     text-transform:uppercase; margin-bottom:10px; }
+    .card { background:#161B22; border:1px solid #30363D; border-radius:8px;
+            padding:16px; margin-bottom:10px; }
+    .weather-big { font-size:2.4rem; font-weight:700; color:#fff; }
+    .weather-sub { color:#8B9BB4; font-size:0.85rem; margin-top:4px; }
+    .stat-row { display:flex; gap:24px; flex-wrap:wrap; }
+    .stat-box { text-align:center; }
+    .stat-val { font-size:1.5rem; font-weight:700; color:#00FFD1;
+                font-family:'Courier New',monospace; }
+    .stat-label { font-size:0.72rem; color:#8B9BB4; text-transform:uppercase; }
+    .commit { border-left:2px solid #00FFD140; padding-left:10px; margin-bottom:8px; }
+    .commit-sha { font-family:'Courier New',monospace; color:#FFB347; font-size:0.75rem; }
+    .commit-msg { font-size:0.85rem; }
+    .commit-repo { font-size:0.72rem; color:#8B9BB4; }
+    .news-item { margin-bottom:10px; }
+    .news-title { color:#58A6FF; font-size:0.88rem; text-decoration:none; }
+    .news-source { font-size:0.72rem; color:#8B9BB4; margin-top:2px; }
+    .bar-row { display:flex; align-items:center; gap:8px; margin-bottom:6px; font-size:0.78rem; }
+    .bar-label { width:36px; color:#8B9BB4; text-align:right; }
+    .bar-track { flex:1; height:6px; background:#21262D; border-radius:3px; overflow:hidden; }
+    .bar-fill { height:100%; background:#00FFD1; border-radius:3px; }
+    .bar-fill.warning { background:#FFB347; }
+    .bar-fill.critical { background:#FF5555; }
+    .bar-val { width:40px; color:#8B9BB4; font-size:0.72rem; }
+    .quote-block { border-left:3px solid #00FFD1; padding-left:14px; margin:0; }
+    .quote-text { font-size:0.95rem; font-style:italic; color:#E6EDF3; }
+    .quote-author { font-size:0.78rem; color:#8B9BB4; margin-top:6px; }
+    .footer { border-top:1px solid #30363D; padding-top:14px; color:#8B9BB4;
+              font-size:0.72rem; text-align:center; }
+    .streak { color:#FFB347; font-size:1.4rem; font-weight:700; }
+  </style>
+</head>
+<body>
+<div class="wrapper">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">PULSE</div>
+    <div class="date">{{ sent_at }}</div>
+  </div>
+
+  <!-- Quote -->
+  {% if quote %}
+  <div class="section">
+    <div class="section-title">Today's Thought</div>
+    <blockquote class="quote-block">
+      <p class="quote-text">"{{ quote.text }}"</p>
+      <p class="quote-author">— {{ quote.author }}</p>
+    </blockquote>
+  </div>
+  {% endif %}
+
+  <!-- Weather -->
+  {% if weather and weather.current %}
+  {% set w = weather.current %}
+  <div class="section">
+    <div class="section-title">Weather — {{ w.city }}</div>
+    <div class="card">
+      <div class="weather-big">{{ w.icon }} {{ w.temp }}{{ w.unit }}</div>
+      <div class="weather-sub">
+        {{ w.description }} &nbsp;·&nbsp;
+        💧 {{ w.humidity }}% humidity &nbsp;·&nbsp;
+        💨 {{ w.wind_kph }} km/h &nbsp;·&nbsp;
+        Feels like {{ w.feels_like }}{{ w.unit }}
+      </div>
+      {% if weather.forecast %}
+      <div style="margin-top:12px; display:flex; gap:16px;">
+        {% for d in weather.forecast %}
+        <div style="text-align:center;">
+          <div style="font-size:0.7rem; color:#8B9BB4;">{{ d.day[:3] }}</div>
+          <div style="font-size:1.2rem;">{{ d.icon }}</div>
+          <div style="font-size:0.78rem;">{{ d.high }}° / {{ d.low }}°</div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- GitHub -->
+  {% if github and not github.error %}
+  <div class="section">
+    <div class="section-title">GitHub — @{{ github.username }}</div>
+    <div class="card">
+      <div class="stat-row">
+        <div class="stat-box">
+          <div class="stat-val">{{ github.public_repos }}</div>
+          <div class="stat-label">Repos</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val">{{ github.followers }}</div>
+          <div class="stat-label">Followers</div>
+        </div>
+        <div class="stat-box">
+          <div class="streak">{{ github.streak_days }}🔥</div>
+          <div class="stat-label">Day streak</div>
+        </div>
+      </div>
+      {% if github.recent_commits %}
+      <div style="margin-top:14px;">
+        {% for c in github.recent_commits[:3] %}
+        <div class="commit">
+          <div class="commit-sha">{{ c.sha }} &nbsp;·&nbsp;
+            <span class="commit-repo">{{ c.repo }}</span>
+          </div>
+          <div class="commit-msg">{{ c.message }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Study -->
+  {% if study %}
+  <div class="section">
+    <div class="section-title">Study — 7-Day Summary</div>
+    <div class="card">
+      <div class="stat-row">
+        <div class="stat-box">
+          <div class="stat-val">{{ study.today_min }}</div>
+          <div class="stat-label">min today</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val">{{ study.total_hours }}</div>
+          <div class="stat-label">hours total</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val">{{ study.session_count }}</div>
+          <div class="stat-label">sessions</div>
+        </div>
+      </div>
+      {% if study.topics %}
+      <div style="margin-top:14px;">
+        {% set max_min = study.topics.values() | max %}
+        {% for topic, mins in study.topics | dictsort(by='value', reverse=true) %}
+        {% if loop.index <= 4 %}
+        <div class="bar-row">
+          <span class="bar-label" style="width:90px; text-align:left;">{{ topic[:14] }}</span>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:{{ [(mins / max_min * 100), 100]|min }}%"></div>
+          </div>
+          <span class="bar-val">{{ mins | round(0) | int }}m</span>
+        </div>
+        {% endif %}
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- System -->
+  {% if system and not system.error %}
+  <div class="section">
+    <div class="section-title">System — {{ system.hostname }}</div>
+    <div class="card">
+      <div class="bar-row">
+        <span class="bar-label">CPU</span>
+        <div class="bar-track">
+          <div class="bar-fill {{ system.cpu.status }}" style="width:{{ system.cpu.percent }}%"></div>
+        </div>
+        <span class="bar-val">{{ system.cpu.percent }}%</span>
+      </div>
+      <div class="bar-row">
+        <span class="bar-label">RAM</span>
+        <div class="bar-track">
+          <div class="bar-fill {{ system.ram.status }}" style="width:{{ system.ram.percent }}%"></div>
+        </div>
+        <span class="bar-val">{{ system.ram.used_gb }}GB</span>
+      </div>
+      <div class="bar-row">
+        <span class="bar-label">Disk</span>
+        <div class="bar-track">
+          <div class="bar-fill {{ system.disk.status }}" style="width:{{ system.disk.percent }}%"></div>
+        </div>
+        <span class="bar-val">{{ system.disk.free_gb }}GB free</span>
+      </div>
+      <div style="margin-top:8px; font-size:0.75rem; color:#8B9BB4;">
+        ⏱ Uptime: {{ system.uptime }} &nbsp;·&nbsp;
+        ↑ {{ system.network.sent_kbps }} KB/s &nbsp;·&nbsp;
+        ↓ {{ system.network.recv_kbps }} KB/s
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- News -->
+  {% if news %}
+  <div class="section">
+    <div class="section-title">News</div>
+    {% for topic, articles in news.items() %}
+    <div style="margin-bottom:12px;">
+      <div style="font-size:0.68rem; color:#8B9BB4; text-transform:uppercase; letter-spacing:.1em; margin-bottom:6px;">
+        {{ topic }}
+      </div>
+      {% for a in articles[:2] %}
+      <div class="news-item">
+        <a href="{{ a.url }}" class="news-title">{{ a.title }}</a>
+        <div class="news-source">{{ a.source }} &nbsp;·&nbsp; {{ a.time }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Footer -->
+  <div class="footer">
+    Generated by <strong style="color:#00FFD1;">Pulse</strong> — your personal morning dashboard.
+  </div>
+
+</div>
+</body>
+</html>
